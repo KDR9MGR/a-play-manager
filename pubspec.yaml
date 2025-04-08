@@ -1,0 +1,53 @@
+name: a_play_manage
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Firebase packages
+  firebase_core: ^2.27.1
+  firebase_auth: ^4.17.9
+  cloud_firestore: ^4.15.9
+  firebase_storage: ^11.6.10
+  
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.3
+  
+  # UI packages
+  google_fonts: ^6.1.0
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.1
+  image_picker: ^1.0.7
+  intl: ^0.19.0
+  fl_chart: ^0.66.2
+  shimmer: ^3.0.0
+  iconsax: ^0.0.8
+  
+  # Form validation
+  form_validator: ^2.1.1
+  
+  # Navigation
+  go_router: ^13.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  # Build runner for Riverpod code generation
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.3.9
+  custom_lint: ^0.6.2
+  riverpod_lint: ^2.3.7
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
