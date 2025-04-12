@@ -26,15 +26,24 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
   final _tagsController = TextEditingController();
   final _maxAttendeesController = TextEditingController();
   final _ticketPriceController = TextEditingController();
-  
+
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 1, hours: 2));
   bool _isPaid = false;
   File? _bannerImage;
-  
+
+  // Add new fields for club event and layout type
+  bool _isClubEvent = false;
+  String _layoutType = 'standing'; // 'seating' or 'standing'
+  final _rowsController = TextEditingController();
+  final _columnsController = TextEditingController();
+  final List<TicketType> _ticketTypes = [
+    TicketType(name: 'General Admission', price: 0.0, quantity: 100)
+  ];
+
   final _dateFormat = DateFormat('E, MMM d, yyyy');
   final _timeFormat = DateFormat('h:mm a');
-  
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -43,20 +52,22 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
     _tagsController.dispose();
     _maxAttendeesController.dispose();
     _ticketPriceController.dispose();
+    _rowsController.dispose();
+    _columnsController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (pickedFile != null) {
       setState(() {
         _bannerImage = File(pickedFile.path);
       });
     }
   }
-  
+
   Future<void> _selectStartDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -64,7 +75,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    
+
     if (picked != null && picked != _startDate) {
       setState(() {
         _startDate = DateTime(
@@ -74,7 +85,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
           _startDate.hour,
           _startDate.minute,
         );
-        
+
         // If end date is before start date, update it
         if (_endDate.isBefore(_startDate)) {
           _endDate = _startDate.add(const Duration(hours: 2));
@@ -82,13 +93,13 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       });
     }
   }
-  
+
   Future<void> _selectStartTime() async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_startDate),
     );
-    
+
     if (picked != null) {
       setState(() {
         _startDate = DateTime(
@@ -98,7 +109,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
           picked.hour,
           picked.minute,
         );
-        
+
         // If end time is before start time on the same day, update it
         if (_endDate.year == _startDate.year &&
             _endDate.month == _startDate.month &&
@@ -109,7 +120,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       });
     }
   }
-  
+
   Future<void> _selectEndDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -117,7 +128,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       firstDate: DateTime(_startDate.year, _startDate.month, _startDate.day),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    
+
     if (picked != null && picked != _endDate) {
       setState(() {
         _endDate = DateTime(
@@ -130,13 +141,13 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       });
     }
   }
-  
+
   Future<void> _selectEndTime() async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_endDate),
     );
-    
+
     if (picked != null) {
       final newEndDate = DateTime(
         _endDate.year,
@@ -145,7 +156,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
         picked.hour,
         picked.minute,
       );
-      
+
       // Only update if end time is after start time when on the same day
       if (_startDate.year != _endDate.year ||
           _startDate.month != _endDate.month ||
@@ -164,24 +175,40 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       }
     }
   }
-  
+
   List<String> _parseTags() {
     if (_tagsController.text.trim().isEmpty) {
       return [];
     }
-    
+
     return _tagsController.text
         .split(',')
         .map((tag) => tag.trim())
         .where((tag) => tag.isNotEmpty)
         .toList();
   }
-  
+
+  // Add a method to add a ticket type
+  void _addTicketType() {
+    setState(() {
+      _ticketTypes.add(TicketType(name: '', price: 0.0, quantity: 0));
+    });
+  }
+
+  // Add a method to remove a ticket type
+  void _removeTicketType(int index) {
+    if (_ticketTypes.length > 1) {
+      setState(() {
+        _ticketTypes.removeAt(index);
+      });
+    }
+  }
+
   Future<void> _createEvent() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
     // Validate times
     if (_endDate.isBefore(_startDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -192,10 +219,44 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       );
       return;
     }
-    
+
+    // Validate seating layout
+    if (_layoutType == 'seating') {
+      if (_rowsController.text.isEmpty || _columnsController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter the number of rows and columns'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+    }
+
+    // Validate ticket types for standing layout
+    if (_layoutType == 'standing') {
+      bool hasEmptyFields = false;
+      for (var ticket in _ticketTypes) {
+        if (ticket.name.isEmpty) {
+          hasEmptyFields = true;
+          break;
+        }
+      }
+
+      if (hasEmptyFields) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all ticket type details'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+    }
+
     // Get user data
     final userAsync = await ref.read(currentUserProvider.future);
-    
+
     if (userAsync == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -205,9 +266,9 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       );
       return;
     }
-    
+
     final eventNotifier = ref.read(eventNotifierProvider.notifier);
-    
+
     final eventId = await eventNotifier.createEvent(
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
@@ -224,8 +285,16 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
           ? double.tryParse(_ticketPriceController.text.trim())
           : null,
       isPaid: _isPaid,
+      isClubEvent: _isClubEvent,
+      layoutType: _layoutType,
+      rows:
+          _layoutType == 'seating' ? int.tryParse(_rowsController.text) : null,
+      columns: _layoutType == 'seating'
+          ? int.tryParse(_columnsController.text)
+          : null,
+      ticketTypes: _layoutType == 'standing' ? _ticketTypes : null,
     );
-    
+
     if (eventId != null) {
       if (context.mounted) {
         context.pop();
@@ -236,11 +305,11 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final eventState = ref.watch(eventNotifierProvider);
-    
+
     return Scaffold(
       appBar: const CustomAppBar(
         title: 'Create Event',
@@ -295,7 +364,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Event Details
                 CustomTextField(
                   label: 'Event Title',
@@ -310,7 +379,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 CustomTextField(
                   label: 'Description',
                   hint: 'Enter event description',
@@ -325,7 +394,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 CustomTextField(
                   label: 'Location',
                   hint: 'Enter event location',
@@ -339,7 +408,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Start Date & Time
                 Text(
                   'Start Date & Time',
@@ -398,7 +467,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // End Date & Time
                 Text(
                   'End Date & Time',
@@ -457,16 +526,17 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Tags
                 CustomTextField(
                   label: 'Tags',
-                  hint: 'Enter comma-separated tags (e.g. music, concert, jazz)',
+                  hint:
+                      'Enter comma-separated tags (e.g. music, concert, jazz)',
                   controller: _tagsController,
                   prefixIcon: Icons.tag,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Max Attendees
                 CustomTextField(
                   label: 'Maximum Attendees (optional)',
@@ -476,8 +546,276 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 16),
-                
+
+                // After the Max Attendees field, add Club Event toggle
+                const SizedBox(height: 16),
+
+                // Club Event Toggle
+                SwitchListTile(
+                  title: Text(
+                    'Club Event',
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  subtitle: Text(
+                    'Toggle if this is a club event',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  value: _isClubEvent,
+                  onChanged: (value) {
+                    setState(() {
+                      _isClubEvent = value;
+                    });
+                  },
+                  contentPadding: EdgeInsets.zero,
+                ),
+
+                // After the Club Event toggle, add Layout Type selection
+                const SizedBox(height: 16),
+
+                // Layout Type Selection
+                Text(
+                  'Event Layout',
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'Standing',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        value: 'standing',
+                        groupValue: _layoutType,
+                        onChanged: (value) {
+                          setState(() {
+                            _layoutType = value!;
+                          });
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'Seating',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        value: 'seating',
+                        groupValue: _layoutType,
+                        onChanged: (value) {
+                          setState(() {
+                            _layoutType = value!;
+                          });
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Conditional UI based on layout type
+                if (_layoutType == 'seating') ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Seating Layout',
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomTextField(
+                          label: 'Rows',
+                          hint: 'Number of rows',
+                          controller: _rowsController,
+                          prefixIcon: Icons.view_week,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (_layoutType == 'seating' &&
+                                (value == null || value.isEmpty)) {
+                              return 'Please enter rows';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: CustomTextField(
+                          label: 'Columns',
+                          hint: 'Number of columns',
+                          controller: _columnsController,
+                          prefixIcon: Icons.view_column,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (_layoutType == 'seating' &&
+                                (value == null || value.isEmpty)) {
+                              return 'Please enter columns';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                if (_layoutType == 'standing') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Ticket Types',
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _addTicketType,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._ticketTypes.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final ticket = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Ticket Type ${index + 1}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium!
+                                      .copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                if (_ticketTypes.length > 1)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () => _removeTicketType(index),
+                                    constraints: const BoxConstraints(),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              decoration: const InputDecoration(
+                                labelText: 'Ticket Name',
+                                hintText: 'e.g., VIP, General',
+                                border: OutlineInputBorder(),
+                              ),
+                              initialValue: ticket.name,
+                              onChanged: (value) {
+                                setState(() {
+                                  _ticketTypes[index].name = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (_layoutType == 'standing' &&
+                                    (value == null || value.isEmpty)) {
+                                  return 'Please enter ticket name';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Price',
+                                      hintText: 'Enter price',
+                                      border: OutlineInputBorder(),
+                                      prefixText: '\$',
+                                    ),
+                                    initialValue: ticket.price.toString(),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _ticketTypes[index].price =
+                                            double.tryParse(value) ?? 0.0;
+                                      });
+                                    },
+                                    validator: (value) {
+                                      if (_layoutType == 'standing' &&
+                                          (value == null || value.isEmpty)) {
+                                        return 'Please enter price';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Quantity',
+                                      hintText: 'Available tickets',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    initialValue: ticket.quantity.toString(),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _ticketTypes[index].quantity =
+                                            int.tryParse(value) ?? 0;
+                                      });
+                                    },
+                                    validator: (value) {
+                                      if (_layoutType == 'standing' &&
+                                          (value == null || value.isEmpty)) {
+                                        return 'Please enter quantity';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+
                 // Ticket Price
+                const SizedBox(height: 16),
                 SwitchListTile(
                   title: Text(
                     'Paid Event',
@@ -497,25 +835,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   },
                   contentPadding: EdgeInsets.zero,
                 ),
-                
-                if (_isPaid) ...[
-                  const SizedBox(height: 8),
-                  CustomTextField(
-                    label: 'Ticket Price',
-                    hint: 'Enter ticket price',
-                    controller: _ticketPriceController,
-                    prefixIcon: Icons.monetization_on,
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (_isPaid && (value == null || value.isEmpty)) {
-                        return 'Please enter ticket price';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-                const SizedBox(height: 24),
-                
+
                 // Error message
                 if (eventState.error != null) ...[
                   Container(
@@ -542,7 +862,7 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Create Event Button
                 CustomButton(
                   text: 'Create Event',
@@ -557,4 +877,4 @@ class _AddEventScreenState extends ConsumerState<AddEventScreen> {
       ),
     );
   }
-} 
+}

@@ -2,38 +2,75 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to determine if a user is an admin
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // Helper functions
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+
+    // Helper function to check if user is verified
+    function isVerified() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true;
+    }
+
+    function isEventOrganizer(eventId) {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/events/$(eventId)).data.organizerId == request.auth.uid;
     }
 
     // Events collection
     match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() &&
-        request.auth.uid == resource.data.organizerId;
+      allow read: if true;
+      // For development, allow any signed-in user to create events
+      // Change back to isVerified() for production
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
       
       // Allow access to subcollections
       match /{document=**} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isSignedIn();
+      }
+      
+      // Explicit rules for ticket types subcollection
+      match /ticketTypes/{ticketId} {
+        allow read: if true;
+        allow write: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
+      }
+      
+      // Explicit rules for seating subcollection
+      match /seating/{layoutId} {
+        allow read: if true;
+        allow write: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
       }
     }
 
     // Activities collection
     match /activities/{activityId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isVerified();
     }
 
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && 
-        request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == userId && 
+        request.resource.data.keys().hasAll(['email', 'displayName']) &&
+        request.resource.data.isVerified == false; // Ensure new users start as unverified
+      allow update: if request.auth != null && 
+        (
+          // Users can update their own data except verification status
+          (request.auth.uid == userId && 
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['isVerified']) == false) ||
+          // Only admins can update verification status
+          isAdmin()
+        );
+      allow delete: if isAdmin();
     }
   }
 }

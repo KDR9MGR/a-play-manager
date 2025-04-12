@@ -8,6 +8,7 @@ class UserModel {
   final String? bio;
   final String? profileImageUrl;
   final bool isOrganizer;
+  final bool isVerified;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -19,6 +20,7 @@ class UserModel {
     this.bio,
     this.profileImageUrl,
     required this.isOrganizer,
+    required this.isVerified,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -31,6 +33,7 @@ class UserModel {
     String? bio,
     String? profileImageUrl,
     bool? isOrganizer,
+    bool? isVerified,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -42,6 +45,7 @@ class UserModel {
       bio: bio ?? this.bio,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       isOrganizer: isOrganizer ?? this.isOrganizer,
+      isVerified: isVerified ?? this.isVerified,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -55,6 +59,7 @@ class UserModel {
       'bio': bio,
       'profileImageUrl': profileImageUrl,
       'isOrganizer': isOrganizer,
+      'isVerified': isVerified,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -69,6 +74,7 @@ class UserModel {
       bio: map['bio'],
       profileImageUrl: map['profileImageUrl'],
       isOrganizer: map['isOrganizer'] ?? false,
+      isVerified: map['isVerified'] ?? false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );

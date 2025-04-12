@@ -5,7 +5,6 @@ import 'package:a_play_manage/features/auth/providers/auth_provider.dart';
 import 'package:a_play_manage/shared/widgets/custom_text_field.dart';
 import 'package:a_play_manage/shared/widgets/custom_button.dart';
 import 'package:a_play_manage/shared/widgets/custom_app_bar.dart';
-import 'package:a_play_manage/core/theme/colors.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -34,18 +33,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
-      await ref.read(authNotifierProvider.notifier).register(
-            name: _nameController.text.trim(),
+      await ref.read(authProvider.notifier).signUp(
+            displayName: _nameController.text.trim(),
             email: _emailController.text.trim(),
             password: _passwordController.text,
-            isOrganizer: false,
           );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       appBar: const CustomAppBar(
@@ -167,8 +165,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              authState.error!,
-                              style: TextStyle(color: Colors.red),
+                              authState.error.toString(),
+                              style: const TextStyle(color: Colors.red),
                             ),
                           ),
                         ],

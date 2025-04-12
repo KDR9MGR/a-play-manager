@@ -21,6 +21,11 @@ class EventRepository {
     int? maxAttendees,
     double? ticketPrice,
     required bool isPaid,
+    bool isClubEvent = false,
+    String layoutType = 'standing',
+    int? rows,
+    int? columns,
+    List<Map<String, dynamic>>? ticketTypes,
   }) async {
     try {
       // Create a new document reference with auto-generated ID
@@ -50,10 +55,40 @@ class EventRepository {
         bannerImageUrl: bannerImageUrl,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        isClubEvent: isClubEvent,
+        layoutType: layoutType,
       );
       
       // Save event to Firestore
-      await eventRef.set(event.toMap());
+      final eventData = event.toMap();
+      
+      // Store the new fields in a separate metadata document to avoid affecting other apps
+      await eventRef.set(eventData);
+      
+      // If it's a seating layout, save rows and columns in a subcollection
+      if (layoutType == 'seating' && rows != null && columns != null) {
+        await eventRef.collection('seating').doc('layout').set({
+          'rows': rows,
+          'columns': columns,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      
+      // If it's a standing layout with ticket types, save them in a subcollection
+      if (layoutType == 'standing' && ticketTypes != null && ticketTypes.isNotEmpty) {
+        final batch = _firestore.batch();
+        
+        for (var i = 0; i < ticketTypes.length; i++) {
+          final ticketDoc = eventRef.collection('ticketTypes').doc();
+          batch.set(ticketDoc, {
+            ...ticketTypes[i],
+            'index': i,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        
+        await batch.commit();
+      }
       
       return eventRef.id;
     } catch (e) {

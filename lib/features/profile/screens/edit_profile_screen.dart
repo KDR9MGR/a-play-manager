@@ -72,7 +72,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         throw Exception('User not logged in');
       }
       
-      final updatedUser = currentUser.copyWith(
+      await authRepository.updateProfile(
+        uid: currentUser.id,
         name: _nameController.text.trim(),
         phoneNumber: _phoneController.text.trim().isNotEmpty 
             ? _phoneController.text.trim() 
@@ -80,14 +81,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         bio: _bioController.text.trim().isNotEmpty 
             ? _bioController.text.trim() 
             : null,
-        updatedAt: DateTime.now(),
       );
-      
-      final result = await authRepository.updateUser(updatedUser);
-      
-      if (result == null) {
-        throw Exception('Failed to update profile');
-      }
       
       setState(() {
         _successMessage = 'Profile updated successfully!';

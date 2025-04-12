@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import '../data/dashboard_provider.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -34,39 +35,131 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
     final dashboardAsync = ref.watch(dashboardProvider);
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/events/add'),
-        icon: const Icon(Iconsax.add_circle),
-        label: const Text('Add Event'),
-      ),
-      body: SafeArea(
-        child: dashboardAsync.when(
-          data: (dashboard) => SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _WelcomeHeader(),
-                const SizedBox(height: 16),
-                _buildQuickActions(),
-                const SizedBox(height: 24),
-                _buildStatCards(dashboard),
-                const SizedBox(height: 24),
-                _buildCharts(dashboard),
-                const SizedBox(height: 24),
-                _buildRecentActivities(dashboard),
-              ],
+    // Show loading if auth state is loading
+    if (authState.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    // Show error if auth state has error
+    if (authState.error != null) {
+      return Scaffold(
+        body: Center(
+          child: Text(
+            'Error: ${authState.error}',
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+    
+    // Check if user is verified
+    final user = authState.user;
+    if (user == null) {
+      // Redirect to login should happen via router, but add fallback
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Please login to access the dashboard',
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+
+    // Check if user is verified
+    final userState = ref.watch(currentUserProvider);
+    
+    return userState.when(
+      data: (userModel) {
+        if (userModel == null || !userModel.isVerified) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Iconsax.shield_cross,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Account Not Verified',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Please wait for admin verification to access the dashboard.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () => context.go('/'),
+                    icon: const Icon(Iconsax.arrow_left),
+                    label: const Text('Go Back'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => context.push('/events/add'),
+            icon: const Icon(Iconsax.add_circle),
+            label: const Text('Add Event'),
+          ),
+          body: SafeArea(
+            child: dashboardAsync.when(
+              data: (dashboard) => SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _WelcomeHeader(),
+                    const SizedBox(height: 16),
+                    _buildQuickActions(),
+                    const SizedBox(height: 24),
+                    _buildStatCards(dashboard),
+                    const SizedBox(height: 24),
+                    _buildCharts(dashboard),
+                    const SizedBox(height: 24),
+                    _buildRecentActivities(dashboard),
+                  ],
+                ),
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(
+                child: Text(
+                  'Error loading dashboard data: $error',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
             ),
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Text(
-              'Error loading dashboard data: $error',
-              style: const TextStyle(color: Colors.red),
-            ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        body: Center(
+          child: Text(
+            'Error: $error',
+            style: const TextStyle(color: Colors.red),
           ),
         ),
       ),

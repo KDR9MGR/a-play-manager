@@ -403,12 +403,12 @@ class _EventDetailsScreenState extends ConsumerState<EventDetailsScreen> {
     final eventState = ref.watch(eventNotifierProvider);
     
     if (_isLoading) {
-      return Scaffold(
-        appBar: const CustomAppBar(
+      return const Scaffold(
+        appBar: CustomAppBar(
           title: 'Event Details',
           showBackButton: true,
         ),
-        body: const LoadingWidget(),
+        body: LoadingWidget(),
       );
     }
     
@@ -454,12 +454,12 @@ class _EventDetailsScreenState extends ConsumerState<EventDetailsScreen> {
     }
     
     if (_event == null) {
-      return Scaffold(
-        appBar: const CustomAppBar(
+      return const Scaffold(
+        appBar: CustomAppBar(
           title: 'Event Details',
           showBackButton: true,
         ),
-        body: const Center(
+        body: Center(
           child: Text('Event not found'),
         ),
       );

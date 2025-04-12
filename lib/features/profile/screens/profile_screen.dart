@@ -170,7 +170,7 @@ class ProfileScreen extends ConsumerWidget {
           CustomButton(
             text: 'Sign Out',
             onPressed: () {
-              ref.read(authNotifierProvider.notifier).signOut();
+              ref.read(authProvider.notifier).signOut();
             },
             icon: Icons.logout,
             isOutlined: true,

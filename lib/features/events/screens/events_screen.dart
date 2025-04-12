@@ -28,7 +28,7 @@ class EventsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              ref.read(authNotifierProvider.notifier).signOut();
+              ref.read(authProvider.notifier).signOut();
             },
           ),
         ],

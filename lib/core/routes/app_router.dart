@@ -1,14 +1,16 @@
+import 'package:a_play_manage/features/auth/data/auth_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:a_play_manage/features/auth/screens/login_screen.dart';
+import 'package:a_play_manage/features/auth/screens/register_screen.dart';
+import 'package:a_play_manage/features/auth/screens/forgot_password_screen.dart';
+import 'package:a_play_manage/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:a_play_manage/features/events/screens/events_screen.dart';
 import 'package:a_play_manage/features/events/screens/add_event_screen.dart';
 import 'package:a_play_manage/features/events/screens/edit_event_screen.dart';
 import 'package:a_play_manage/features/events/screens/event_details_screen.dart';
 import 'package:a_play_manage/features/profile/screens/profile_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/auth/data/auth_provider.dart';
-import '../../features/dashboard/presentation/dashboard_screen.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/events/presentation/events_screen.dart';
 
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -16,21 +18,31 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/login',
+    debugLogDiagnostics: true, // Enable debug logging
     redirect: (context, state) {
-      // Handle loading state
-      if (authState.isLoading || authState.hasError) return null;
+      
 
-      final isLoggedIn = authState.valueOrNull != null;
-      final isLoggingIn = state.matchedLocation == '/login';
+      final isLoggedIn = authState.value != null;
+      final isLoggingIn = state.uri.toString() == '/login';
+      final isRegistering = state.uri.toString() == '/register';
+      final isForgotPassword = state.uri.toString() == '/forgot-password';
 
-      if (!isLoggedIn && !isLoggingIn) {
+      // Allow access to auth-related pages when not logged in
+      if (!isLoggedIn) {
+        if (isLoggingIn || isRegistering || isForgotPassword) {
+          return null;
+        }
+        debugPrint('Redirecting to login');
         return '/login';
       }
 
-      if (isLoggedIn && isLoggingIn) {
+      // Redirect to dashboard if trying to access auth pages while logged in
+      if (isLoggedIn && (isLoggingIn || isRegistering || isForgotPassword)) {
+        debugPrint('Redirecting to dashboard');
         return '/dashboard';
       }
 
+      debugPrint('No redirect needed');
       return null;
     },
     routes: [
@@ -39,26 +51,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
         path: '/dashboard',
         builder: (context, state) {
-          // Show loading indicator while checking auth state
           if (authState.isLoading) {
             return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           }
-          
-          // Show error if auth state has error
-          if (authState.hasError) {
-            return Scaffold(
-              body: Center(
-                child: Text('Error: ${authState.error}'),
-              ),
-            );
-          }
-          
           return const DashboardScreen();
         },
       ),

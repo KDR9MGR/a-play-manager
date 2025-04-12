@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:a_play_manage/features/auth/providers/auth_provider.dart';
+import 'package:a_play_manage/features/auth/data/forgot_password_service.dart';
 import 'package:a_play_manage/shared/widgets/custom_text_field.dart';
 import 'package:a_play_manage/shared/widgets/custom_button.dart';
 import 'package:a_play_manage/shared/widgets/custom_app_bar.dart';
@@ -16,7 +16,6 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  bool _resetSent = false;
 
   @override
   void dispose() {
@@ -26,18 +25,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   Future<void> _resetPassword() async {
     if (_formKey.currentState!.validate()) {
-      await ref.read(authNotifierProvider.notifier).resetPassword(
+      await ref.read(passwordResetProvider.notifier).resetPassword(
             _emailController.text.trim(),
           );
-      setState(() {
-        _resetSent = true;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
+    final resetState = ref.watch(passwordResetProvider);
 
     return Scaffold(
       appBar: const CustomAppBar(
@@ -73,7 +69,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 32),
                 
-                if (!_resetSent) ...[
+                if (!resetState.isSuccess) ...[
                   CustomTextField(
                     label: 'Email',
                     hint: 'Enter your email',
@@ -94,7 +90,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   const SizedBox(height: 24),
 
                   // Error message
-                  if (authState.error != null) ...[
+                  if (resetState.error != null) ...[
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -110,8 +106,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              authState.error!,
-                              style: TextStyle(color: Colors.red),
+                              resetState.error.toString(),
+                              style: const TextStyle(color: Colors.red),
                             ),
                           ),
                         ],
@@ -123,7 +119,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   CustomButton(
                     text: 'Reset Password',
                     onPressed: _resetPassword,
-                    isLoading: authState.isLoading,
+                    isLoading: resetState.isLoading,
                     icon: Icons.send,
                   ),
                 ] else ...[
@@ -159,7 +155,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   const SizedBox(height: 24),
                   CustomButton(
                     text: 'Back to Login',
-                    onPressed: () => context.pushNamed('login'),
+                    onPressed: () => context.go('/login'),
                     isOutlined: true,
                     icon: Icons.arrow_back,
                   ),

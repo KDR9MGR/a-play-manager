@@ -17,6 +17,8 @@ class Event {
   final String? bannerImageUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isClubEvent;
+  final String layoutType;
 
   Event({
     required this.id,
@@ -35,6 +37,8 @@ class Event {
     this.bannerImageUrl,
     required this.createdAt,
     required this.updatedAt,
+    this.isClubEvent = false,
+    this.layoutType = 'standing',
   });
 
   Event copyWith({
@@ -54,6 +58,8 @@ class Event {
     String? bannerImageUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isClubEvent,
+    String? layoutType,
   }) {
     return Event(
       id: id ?? this.id,
@@ -72,11 +78,13 @@ class Event {
       bannerImageUrl: bannerImageUrl ?? this.bannerImageUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isClubEvent: isClubEvent ?? this.isClubEvent,
+      layoutType: layoutType ?? this.layoutType,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final Map<String, dynamic> data = {
       'title': title,
       'description': description,
       'location': location,
@@ -92,7 +100,10 @@ class Event {
       'bannerImageUrl': bannerImageUrl,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'category': 'event',
     };
+    
+    return data;
   }
 
   factory Event.fromMap(Map<String, dynamic> map, String id) {
@@ -113,6 +124,8 @@ class Event {
       bannerImageUrl: map['bannerImageUrl'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      isClubEvent: map['isClubEvent'] ?? false,
+      layoutType: map['layoutType'] ?? 'standing',
     );
   }
 

@@ -3,18 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:a_play_manage/features/auth/repository/auth_repository.dart';
 import 'package:a_play_manage/core/models/user_model.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:a_play_manage/core/errors/auth_exceptions.dart';
 
 // Auth repository provider
-final authRepositoryProvider = Provider((ref) {
-  return AuthRepository(
-    FirebaseAuth.instance,
-    FirebaseFirestore.instance,
-  );
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  return AuthRepository();
 });
 
-// Current user provider
+// Current user provider - provides the UserModel of the current authenticated user
 final currentUserProvider = StreamProvider<UserModel?>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return authRepository.authStateChanges.map((user) {
@@ -25,18 +21,13 @@ final currentUserProvider = StreamProvider<UserModel?>((ref) {
   }).asyncMap((userFuture) async => userFuture);
 });
 
-// Auth state provider
+// Auth state provider - provides a simple boolean indicating if user is logged in
 final authStateProvider = StreamProvider<bool>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return authRepository.authStateChanges.map((user) {
-    if (user != null) {
-      return true;
-    }
-    return false;
-  });
+  return authRepository.authStateChanges.map((user) => user != null);
 });
 
-// Organizer status provider
+// Organizer status provider - provides if current user is an organizer
 final isOrganizerProvider = Provider<bool>((ref) {
   final userAsyncValue = ref.watch(currentUserProvider);
   return userAsyncValue.when(
@@ -46,274 +37,206 @@ final isOrganizerProvider = Provider<bool>((ref) {
   );
 });
 
-// Auth notifier provider
-final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authRepository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(authRepository);
+// User verification status provider - provides if current user is verified
+final isVerifiedProvider = Provider<bool>((ref) {
+  final userAsyncValue = ref.watch(currentUserProvider);
+  return userAsyncValue.when(
+    data: (user) => user?.isVerified ?? false,
+    loading: () => false,
+    error: (_, __) => false,
+  );
 });
 
-// Auth repository
-class AuthRepository {
-  final FirebaseAuth _firebaseAuth;
-  final FirebaseFirestore _firestore;
-
-  AuthRepository(this._firebaseAuth, this._firestore);
-
-  Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
-
-  User? get currentUser => _firebaseAuth.currentUser;
-
-  // Get user data
-  Future<UserModel?> getUserData(String uid) async {
-    final userDoc = await _firestore.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-      return UserModel.fromFirestore(userDoc);
-    }
-    return null;
-  }
-
-  // Get user by ID
-  Future<UserModel?> getUserById(String userId) async {
-    try {
-      final userDoc = await _firestore.collection('users').doc(userId).get();
-      
-      if (!userDoc.exists) {
-        return null;
-      }
-      
-      return UserModel.fromFirestore(userDoc);
-    } catch (e) {
-      debugPrint('Error getting user by ID: $e');
-      return null;
-    }
-  }
-
-  // Sign in
-  Future<UserModel?> signInWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
-    try {
-      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      if (userCredential.user != null) {
-        return getUserData(userCredential.user!.uid);
-      }
-      
-      return null;
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(e.message ?? 'Sign in failed');
-    }
-  }
-
-  // Register
-  Future<UserModel?> registerWithEmailAndPassword({
-    required String email,
-    required String password,
-    required String name,
-    required bool isOrganizer,
-  }) async {
-    try {
-      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      if (userCredential.user != null) {
-        final user = userCredential.user!;
-        
-        // Create user document
-        final newUser = UserModel(
-          id: user.uid,
-          name: name,
-          email: email,
-          isOrganizer: isOrganizer,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        
-        // Save to Firestore
-        await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .set(newUser.toMap());
-            
-        return newUser;
-      }
-      
-      return null;
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(e.message ?? 'Registration failed');
-    }
-  }
-
-  // Sign out
-  Future<void> signOut() async {
-    await _firebaseAuth.signOut();
-  }
-
-  // Reset password
-  Future<void> resetPassword(String email) async {
-    try {
-      await _firebaseAuth.sendPasswordResetEmail(email: email);
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(e.message ?? 'Password reset failed');
-    }
-  }
-
-  // Update user
-  Future<UserModel?> updateUser(UserModel user) async {
-    try {
-      await _firestore
-          .collection('users')
-          .doc(user.id)
-          .update(user.toMap());
-      
-      return user;
-    } catch (e) {
-      debugPrint('Error updating user: $e');
-      return null;
-    }
-  }
-}
-
-// Auth state
+/// Auth State class to handle authentication state
 class AuthState {
   final bool isLoading;
   final String? error;
-  final UserModel? user;
+  final User? user;
+  final bool isAuthenticated;
 
-  AuthState({
+  const AuthState({
     this.isLoading = false,
     this.error,
     this.user,
+    this.isAuthenticated = false,
   });
 
   AuthState copyWith({
     bool? isLoading,
     String? error,
-    UserModel? user,
+    User? user,
+    bool? isAuthenticated,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       error: error,
       user: user ?? this.user,
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
     );
   }
 }
 
-// Auth notifier
+/// Auth notifier for handling authentication state
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
 
-  AuthNotifier(this._authRepository) : super(AuthState());
-
-  Future<void> signIn(String email, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
-    
-    try {
-      final user = await _authRepository.signInWithEmailAndPassword(
-        email,
-        password,
-      );
-      
-      state = state.copyWith(isLoading: false, user: user);
-    } on AuthException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-    }
+  AuthNotifier(this._authRepository) : super(const AuthState()) {
+    // Initialize state by listening to auth changes
+    _init();
   }
 
-  Future<void> register({
+  void _init() {
+    _authRepository.authStateChanges.listen((user) {
+      if (user != null) {
+        state = state.copyWith(
+          user: user,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        );
+      } else {
+        state = state.copyWith(
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+        );
+      }
+    });
+  }
+
+  /// Sign in with email and password
+  Future<void> signIn({
     required String email,
     required String password,
-    required String name,
-    required bool isOrganizer,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
-    
     try {
-      final user = await _authRepository.registerWithEmailAndPassword(
+      state = state.copyWith(isLoading: true, error: null);
+      
+      final userCredential = await _authRepository.signInWithEmailAndPassword(
         email: email,
         password: password,
-        name: name,
-        isOrganizer: isOrganizer,
       );
-      
-      state = state.copyWith(isLoading: false, user: user);
+
+      state = state.copyWith(
+        user: userCredential.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      );
     } on AuthException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message,
+        isAuthenticated: false,
+      );
+      rethrow;
+    } catch (e) {
+      debugPrint('Unexpected error during sign in: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'An unexpected error occurred',
+        isAuthenticated: false,
+      );
+      rethrow;
     }
   }
 
-  Future<void> signOut() async {
-    state = state.copyWith(isLoading: true, error: null);
-    
+  /// Sign up with email, password and display name
+  Future<void> signUp({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
     try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      final userCredential = await _authRepository.registerWithEmailAndPassword(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+
+      state = state.copyWith(
+        user: userCredential.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      );
+    } on AuthException catch (e) {
+      state = state.copyWith(
+        isLoading: false, 
+        error: e.message,
+        isAuthenticated: false,
+      );
+      rethrow;
+    } catch (e) {
+      debugPrint('Unexpected error during sign up: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'An unexpected error occurred',
+        isAuthenticated: false,
+      );
+      rethrow;
+    }
+  }
+
+  /// Sign out the current user
+  Future<void> signOut() async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
       await _authRepository.signOut();
-      state = state.copyWith(isLoading: false, user: null);
+      state = state.copyWith(
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      );
+    } on AuthException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message,
+      );
+      rethrow;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to sign out',
       );
+      rethrow;
     }
   }
 
+  /// Request a password reset email
   Future<void> resetPassword(String email) async {
-    state = state.copyWith(isLoading: true, error: null);
-    
     try {
+      state = state.copyWith(isLoading: true, error: null);
       await _authRepository.resetPassword(email);
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(
+        isLoading: false,
+        error: null,
+      );
     } on AuthException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-    }
-  }
-
-  Future<void> updateUserProfile({
-    required String name,
-    String? phoneNumber,
-    String? bio,
-    String? profileImageUrl,
-  }) async {
-    state = state.copyWith(isLoading: true, error: null);
-    
-    try {
-      if (state.user != null) {
-        final updatedUser = state.user!.copyWith(
-          name: name,
-          phoneNumber: phoneNumber,
-          bio: bio,
-          profileImageUrl: profileImageUrl,
-          updatedAt: DateTime.now(),
-        );
-        
-        final result = await _authRepository.updateUser(updatedUser);
-        
-        if (result != null) {
-          state = state.copyWith(isLoading: false, user: result);
-        } else {
-          state = state.copyWith(
-            isLoading: false,
-            error: 'Failed to update profile',
-          );
-        }
-      }
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message,
+      );
+      rethrow;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Error updating profile: $e',
+        error: 'Failed to send password reset email',
       );
+      rethrow;
     }
   }
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => state.isAuthenticated;
 }
 
-// Auth exception
-class AuthException implements Exception {
-  final String message;
-  
-  AuthException(this.message);
-} 
+// Provider
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final authRepository = ref.watch(authRepositoryProvider);
+  return AuthNotifier(authRepository);
+}); 

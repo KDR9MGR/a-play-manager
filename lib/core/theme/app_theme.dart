@@ -19,11 +19,9 @@ class AppTheme {
   // Theme Data
   static final ThemeData darkTheme = ThemeData.dark().copyWith(
     primaryColor: primaryColor,
-    colorScheme: const ColorScheme.dark(
-      primary: primaryColor,
-      secondary: accentColor,
-      surface: surfaceDark,
-      error: errorColor,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryColor,
+      
     ),
     scaffoldBackgroundColor: backgroundDark,
     cardColor: cardDark,

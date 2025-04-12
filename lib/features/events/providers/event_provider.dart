@@ -3,6 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:a_play_manage/features/events/repository/event_repository.dart';
 import 'package:a_play_manage/core/models/event_model.dart';
 import 'package:a_play_manage/features/auth/providers/auth_provider.dart';
+import 'package:flutter/foundation.dart';
+
+// Ticket type class
+class TicketType {
+  String name;
+  double price;
+  int quantity;
+  
+  TicketType({
+    required this.name,
+    required this.price,
+    required this.quantity,
+  });
+  
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'price': price,
+      'quantity': quantity,
+    };
+  }
+}
 
 // Event repository provider
 final eventRepositoryProvider = Provider<EventRepository>((ref) {
@@ -78,9 +100,20 @@ class EventNotifier extends StateNotifier<EventState> {
     int? maxAttendees,
     double? ticketPrice,
     required bool isPaid,
+    bool isClubEvent = false,
+    String layoutType = 'standing',
+    int? rows,
+    int? columns,
+    List<TicketType>? ticketTypes,
   }) async {
     try {
       state = state.copyWith(isLoading: true, error: null, successMessage: null);
+      
+      // Convert ticket types to maps if provided
+      List<Map<String, dynamic>>? ticketTypeMaps;
+      if (ticketTypes != null) {
+        ticketTypeMaps = ticketTypes.map((ticket) => ticket.toMap()).toList();
+      }
       
       final eventId = await _eventRepository.createEvent(
         title: title,
@@ -94,6 +127,11 @@ class EventNotifier extends StateNotifier<EventState> {
         maxAttendees: maxAttendees,
         ticketPrice: ticketPrice,
         isPaid: isPaid,
+        isClubEvent: isClubEvent,
+        layoutType: layoutType,
+        rows: rows,
+        columns: columns,
+        ticketTypes: ticketTypeMaps,
       );
       
       state = state.copyWith(
@@ -103,7 +141,17 @@ class EventNotifier extends StateNotifier<EventState> {
       
       return eventId;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint('Error in createEvent: $e');
+      String errorMessage = 'Failed to create event';
+      
+      // Create a more user-friendly error message
+      if (e.toString().contains('permission-denied')) {
+        errorMessage = 'You do not have permission to create events. Please check your account status.';
+      } else if (e.toString().contains('unauthorized')) {
+        errorMessage = 'Unable to upload image. Please try again or choose a different image.';
+      }
+      
+      state = state.copyWith(isLoading: false, error: errorMessage);
       return null;
     }
   }
