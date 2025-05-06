@@ -13,64 +13,150 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to check if user is verified
-    function isVerified() {
-      return request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true;
-    }
-
     function isEventOrganizer(eventId) {
       return isSignedIn() && 
         get(/databases/$(database)/documents/events/$(eventId)).data.organizerId == request.auth.uid;
     }
 
+    function isCommentOwner(commentData) {
+      return request.auth != null && commentData.userId == request.auth.uid;
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default rule - deny access unless specific rules allow it
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User profiles - users can read/write their own data
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Service Requests - users can create and read their own requests
+    match /serviceRequests/{requestId} {
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid;
+      
+      allow read: if request.auth != null && 
+                    (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow update, delete: if isAdmin();
+    }
+
     // Events collection
     match /events/{eventId} {
-      allow read: if true;
-      // For development, allow any signed-in user to create events
-      // Change back to isVerified() for production
+      allow read: if true;  // Anyone can read event details
+      
+      // Allow authenticated users to create events
       allow create: if isSignedIn();
+      
+      // Allow organizer or admin to update/delete events
       allow update, delete: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
-      
-      // Allow access to subcollections
-      match /{document=**} {
-        allow read, write: if isSignedIn();
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && 
+          request.resource.data.userId == request.auth.uid;
+        allow delete: if isSignedIn() && 
+          get(/databases/$(database)/documents/events/$(eventId)/comments/$(commentId)).data.userId == request.auth.uid;
       }
-      
-      // Explicit rules for ticket types subcollection
+
+      // Likes subcollection
+      match /likes/{userId} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      // Zones subcollection
+      match /zones/{zoneId} {
+        allow read: if true;
+        allow write: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
+      }
+
+      // Seats subcollection
+      match /seats/{seatId} {
+        allow read: if true;
+        allow create, update: if isAuthenticated();
+        allow delete: if false;
+      }
+
+      // Ticket types subcollection
       match /ticketTypes/{ticketId} {
         allow read: if true;
         allow write: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
       }
-      
-      // Explicit rules for seating subcollection
+
+      // Seating layout subcollection
       match /seating/{layoutId} {
         allow read: if true;
         allow write: if isSignedIn() && (isEventOrganizer(eventId) || isAdmin());
       }
     }
 
-    // Activities collection
-    match /activities/{activityId} {
-      allow read, write: if isVerified();
+    // Admin collection - only admins can access
+    match /admins/{userId} {
+      allow read: if request.auth != null;
     }
 
-    // Users collection
-    match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == userId && 
-        request.resource.data.keys().hasAll(['email', 'displayName']) &&
-        request.resource.data.isVerified == false; // Ensure new users start as unverified
-      allow update: if request.auth != null && 
-        (
-          // Users can update their own data except verification status
-          (request.auth.uid == userId && 
-           request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(['isVerified']) == false) ||
-          // Only admins can update verification status
-          isAdmin()
-        );
-      allow delete: if isAdmin();
+    // Categories collection
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Activities collection
+    match /activities/{activityId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.uid == resource.data.organizerId);
+    }
+
+    // Concierge requests
+    match /concierge_requests/{requestId} {
+      allow create: if request.auth != null 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow read: if request.auth != null 
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Rewards collection
+    match /rewards/{rewardId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // User Points collection
+    match /userPoints/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // User Tiers collection
+    match /userTiers/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

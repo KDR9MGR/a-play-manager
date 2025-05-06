@@ -76,7 +76,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     
     return userState.when(
       data: (userModel) {
-        if (userModel == null || !userModel.isVerified) {
+        print(userModel!.email);
+        if (!userModel.isVerified) {
           return Scaffold(
             body: Center(
               child: Column(
@@ -167,65 +168,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
   }
 
   Widget _buildQuickActions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _QuickActionButton(
-          label: 'My Events',
-          icon: Iconsax.calendar_1,
-          onTap: () => context.push('/events'),
-        ),
-        _QuickActionButton(
-          label: 'Add Event',
-          icon: Iconsax.add_circle,
-          onTap: () => context.push('/events/add'),
-        ),
-        _QuickActionButton(
-          label: 'Profile',
-          icon: Iconsax.profile_circle,
-          onTap: () => context.push('/profile'),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _QuickActionButton(
+            label: 'My Events',
+            icon: Iconsax.calendar_1,
+            onTap: () => context.push('/events'),
+          ),
+          _QuickActionButton(
+            label: 'Add Event',
+            icon: Iconsax.add_circle,
+            onTap: () => context.push('/events/add'),
+          ),
+          _QuickActionButton(
+            label: 'Profile',
+            icon: Iconsax.profile_circle,
+            onTap: () => context.push('/profile'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildStatCards(DashboardData dashboard) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
-    
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.2,
+      childAspectRatio: 1.3,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       children: [
-        _StatCard(
-          title: 'Total Revenue',
-          value: currencyFormat.format(dashboard.totalRevenue),
-          icon: Iconsax.money_recive,
-          color: Colors.green,
-          animation: _animationController,
-        ),
         _StatCard(
           title: 'Total Events',
           value: dashboard.totalEvents.toString(),
           icon: Iconsax.calendar_2,
-          color: Theme.of(context).colorScheme.primary,
+          color: const Color(0xFF6C63FF),
           animation: _animationController,
         ),
         _StatCard(
           title: 'Total Attendees',
           value: NumberFormat.compact().format(dashboard.totalAttendees),
           icon: Iconsax.people,
-          color: Colors.orange,
-          animation: _animationController,
-        ),
-        _StatCard(
-          title: 'Avg. Rating',
-          value: dashboard.averageRating.toStringAsFixed(1),
-          icon: Iconsax.star1,
-          color: Colors.purple,
+          color: const Color(0xFFFF6B6B),
           animation: _animationController,
         ),
       ],
@@ -238,26 +227,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Analytics Overview',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
+          child: Text(
+            'Analytics Overview',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         const SizedBox(height: 16),
         Container(
-          height: 300,
+          height: 400,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withOpacity(0.1),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withOpacity(0.05),
                 spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -265,33 +262,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Revenue Distribution',
+                'Event Categories',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
-                    sections: dashboard.revenueDistribution.entries.map((entry) {
-                      final percentage = total > 0 ? (entry.value / total * 100) : 0;
-                      return PieChartSectionData(
-                        value: entry.value,
-                        title: '${entry.key}\n${percentage.toStringAsFixed(1)}%',
-                        color: _getCategoryColor(entry.key),
-                        radius: 100,
-                        titleStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                child: Stack(
+                  children: [
+                    PieChart(
+                      PieChartData(
+                      
+                        centerSpaceRadius: 60,
+                        
+                        sections: dashboard.revenueDistribution.entries.map((entry) {
+                          final percentage = total > 0 ? (entry.value / total * 100) : 0;
+                          return PieChartSectionData(
+                            value: entry.value,
+                            title: percentage < 5 ? '' : '${percentage.toStringAsFixed(0)}%',
+                            color: _getCategoryColor(entry.key),
+                            radius: 85,
+                            titleStyle: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            showTitle: false,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: _buildChartLegend(dashboard),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -301,16 +310,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     );
   }
 
+  Widget _buildChartLegend(DashboardData dashboard) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: dashboard.revenueDistribution.entries.map((entry) {
+        final total = dashboard.revenueDistribution.values.fold<double>(0, (a, b) => a + b);
+        final percentage = total > 0 ? (entry.value / total * 100) : 0;
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _getCategoryColor(entry.key),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                entry.key,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${percentage.toStringAsFixed(1)}%',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Sports':
-        return Colors.blue;
-      case 'Music':
-        return Colors.green;
-      case 'Theater':
-        return Colors.orange;
+    switch (category.toLowerCase()) {
+      case 'sports':
+        return const Color(0xFF6C63FF);
+      case 'music':
+        return const Color(0xFFFF6B6B);
+      case 'theater':
+        return const Color(0xFFFFBE0B);
       default:
-        return Colors.purple;
+        return const Color(0xFF4ECDC4);
     }
   }
 
@@ -369,32 +422,44 @@ class _QuickActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              icon,
-              color: Theme.of(context).colorScheme.primary,
-              size: 28,
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 100,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -471,13 +536,17 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: color.withOpacity(0.05),
               spreadRadius: 2,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -485,25 +554,33 @@ class _StatCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 28,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 22,
+              ),
             ),
-            const SizedBox(height: 8),
+            const Spacer(),
             Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
             ),
+            const SizedBox(height: 4),
             Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
+                fontSize: 13,
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
               ),
             ),
           ],

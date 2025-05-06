@@ -4,12 +4,15 @@ import 'package:a_play_manage/features/events/repository/event_repository.dart';
 import 'package:a_play_manage/core/models/event_model.dart';
 import 'package:a_play_manage/features/auth/providers/auth_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as path;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Ticket type class
 class TicketType {
-  String name;
-  double price;
-  int quantity;
+  final String name;
+  final double price;
+  final int quantity;
   
   TicketType({
     required this.name,
@@ -23,6 +26,45 @@ class TicketType {
       'price': price,
       'quantity': quantity,
     };
+  }
+
+  factory TicketType.fromMap(Map<String, dynamic> map) {
+    return TicketType(
+      name: map['name'] ?? '',
+      price: (map['price'] ?? 0.0).toDouble(),
+      quantity: map['quantity'] ?? 0,
+    );
+  }
+}
+
+// Zone model class
+class Zone {
+  final String name;
+  final int capacity;
+  final List<TicketType> ticketTypes;
+  
+  Zone({
+    required this.name,
+    required this.capacity,
+    required this.ticketTypes,
+  });
+  
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'capacity': capacity,
+      'ticketTypes': ticketTypes.map((t) => t.toMap()).toList(),
+    };
+  }
+  
+  factory Zone.fromMap(Map<String, dynamic> map) {
+    return Zone(
+      name: map['name'] ?? '',
+      capacity: map['capacity'] ?? 0,
+      ticketTypes: List<TicketType>.from(
+        (map['ticketTypes'] ?? []).map((t) => TicketType.fromMap(t)),
+      ),
+    );
   }
 }
 
@@ -62,7 +104,7 @@ class EventState {
   final String? error;
   final String? successMessage;
   
-  EventState({
+  const EventState({
     this.isLoading = false,
     this.error,
     this.successMessage,
@@ -85,7 +127,7 @@ class EventState {
 class EventNotifier extends StateNotifier<EventState> {
   final EventRepository _eventRepository;
   
-  EventNotifier(this._eventRepository) : super(EventState());
+  EventNotifier(this._eventRepository) : super(const EventState());
   
   // Create a new event
   Future<String?> createEvent({
@@ -242,7 +284,75 @@ class EventNotifier extends StateNotifier<EventState> {
   
   // Clear state
   void clearState() {
-    state = EventState();
+    state = const EventState();
+  }
+
+  // Add createEventWithZones method to the EventNotifier class
+  Future<void> createEventWithZones({
+    required String title,
+    required String description,
+    required String location,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String organizerId,
+    required List<String> tags,
+    required File? bannerImage,
+    int? maxAttendees,
+    required bool isPaid,
+    required bool isClubEvent,
+    required String layoutType,
+    int? rows,
+    int? columns,
+    List<Zone>? zones,
+  }) async {
+    try {
+      state = const EventState(isLoading: true);
+      
+      // Upload banner image to Firebase Storage
+      final storageRef = FirebaseStorage.instance.ref();
+      final bannerPath = 'events/banners/${DateTime.now().millisecondsSinceEpoch}_${path.basename(bannerImage!.path)}';
+      final bannerRef = storageRef.child(bannerPath);
+      
+      await bannerRef.putFile(bannerImage);
+      final bannerUrl = await bannerRef.getDownloadURL();
+      
+      // Create event data
+      final eventData = {
+        'title': title,
+        'description': description,
+        'location': location,
+        'startTime': Timestamp.fromDate(startTime),
+        'endTime': Timestamp.fromDate(endTime),
+        'organizerId': organizerId,
+        'tags': tags,
+        'bannerUrl': bannerUrl,
+        'maxAttendees': maxAttendees,
+        'isPaid': isPaid,
+        'isClubEvent': isClubEvent,
+        'layoutType': layoutType,
+        'rows': rows,
+        'columns': columns,
+        'createdAt': Timestamp.now(),
+      };
+      
+      // Add the event to Firestore
+      final eventsCollection = FirebaseFirestore.instance.collection('events');
+      final eventRef = await eventsCollection.add(eventData);
+      
+      // If zones are provided, create a subcollection for them
+      if (zones != null && zones.isNotEmpty) {
+        final zonesCollection = eventRef.collection('zones');
+        
+        for (final zone in zones) {
+          await zonesCollection.add(zone.toMap());
+        }
+      }
+      
+      state = const EventState();
+    } catch (e) {
+      state = EventState(error: e.toString());
+      rethrow;
+    }
   }
 }
 
